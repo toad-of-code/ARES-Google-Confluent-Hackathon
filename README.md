@@ -188,13 +188,21 @@ npm run dev
 
 ---
 
-## 🔮 Roadmap
+## 🔮 Future Work
 
-* Multi-model ensemble reasoning
-* Temporal anomaly detection
-* Offline simulation & replay mode
-* Kubernetes-native deployment
-* Role-based access control
+* Command Downlink: Enable secure command transmission from the dashboard to resume or halt rover operations.
+
+* Multi-Rover Support: Monitor and manage multiple rovers simultaneously with isolated telemetry streams.
+
+* Cloud Deployment: Containerize services and deploy via Kubernetes for scalable operations.
+
+* Model Ensemble: Combine multiple AI models to improve decision reliability.
+
+* Temporal Analysis: Track hazard trends over time for predictive risk assessment.
+
+* Access Control: Add role-based permissions for operators and observers.
+
+* Audit & Replay: Enable full mission replay for debugging and analysis.
 
 ---
 

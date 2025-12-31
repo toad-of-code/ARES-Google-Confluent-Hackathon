@@ -4,7 +4,7 @@ import time
 import requests
 import uuid
 import datetime
-import statistics  # <--- 1. NEW IMPORT
+import statistics
 from dotenv import load_dotenv
 import vertexai
 from vertexai.generative_models import GenerativeModel, Part
