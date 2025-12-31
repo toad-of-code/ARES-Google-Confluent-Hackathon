@@ -1,5 +1,4 @@
 .venv
 __pycache__
 .env
-api-key-4PKIIY2DBH243GQQ.txt
-ui/orbiter_dashboard/node_modules
+orbiter-dashboard-frontend/node_modules
