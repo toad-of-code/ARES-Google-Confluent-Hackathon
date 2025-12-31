@@ -5,6 +5,8 @@ import requests
 import uuid
 import datetime
 import statistics
+import threading  # <--- NEW IMPORT
+from http.server import HTTPServer, BaseHTTPRequestHandler # <--- NEW IMPORT
 from dotenv import load_dotenv
 import vertexai
 from vertexai.generative_models import GenerativeModel, Part
@@ -57,8 +59,6 @@ except Exception as e:
     print(f"❌ Initialization Failed: {e}")
     exit(1)
 
-print("\n🚀 ORBITER ONLINE. MONITORING FOR TRANSMISSIONS...\n")
-
 # ==========================================
 # 3. HELPER FUNCTIONS
 # ==========================================
@@ -70,14 +70,14 @@ def analyze_image_with_variance(img_data, iterations=3):
     """
     image_part = Part.from_data(img_data, mime_type="image/jpeg")
     
-    # 2. UPDATED PROMPT WITH CONFIDENCE_SCORE
+    # --- UPDATED PROMPT (EQUAL WEIGHT LOGIC) ---
     prompt = """
 Analyze the following Mars rover image and return a JSON object ONLY.
 
 The JSON must contain the following fields:
 {
   "hazard_score": integer (0–10),
-  "confidence_score": integer (0–100),
+  "confidence_score": integer (0-100),
   "scientific_value": integer (0–10),
   "terrain_type": string,
   "analysis_text": string
@@ -85,37 +85,37 @@ The JSON must contain the following fields:
 
 === CRITICAL SCORING GUIDELINES (EQUAL WEIGHT) ===
 
-IMPORTANT: Hazard score and Scientific Value must be evaluated independently and with equal importance. Do NOT let one influence the other.
-
 1. HAZARD SCORE (Navigability):
-   - 0–3 (SAFE): Flat bedrock, hard-packed soil, clear open path or if the image is unclear.
-   - 4–6 (CAUTION): Loose sand, small rocks, moderate slopes.
-   - 7–10 (DANGER): Large boulders, steep cliffs, deep sand traps, or drop-offs.
-   *If rover traversal appears unsafe, this score MUST be high.*
+   - 0-3 (SAFE): Flat bedrock, hard-packed soil, clear open path.
+   - 4-6 (CAUTION): Loose sand, small rocks, moderate slopes, or uneven terrain.
+   - 7-10 (DANGER): Large boulders, steep cliffs, deep sand traps, or sharp drop-offs.
+   *RULE: If the rover's path is blocked or unsafe, this score MUST be high.*
 
-2. SCIENTIFIC VALUE (Geology Only):
-   - Score based ONLY on geological features (rocks, strata, soil, erosion).
-   - DO NOT consider rover hardware, shadows, or instrumentation.
-   - If the image is mostly rover hardware, score must be LOW (0–3).
+2. SCIENTIFIC VALUE (Geology):
+   - Score is based SOLELY on geological features (rocks, soil, strata).
+   - DO NOT assign value to rover hardware, wheels, or selfie components.
+   - If the image is mostly rover hardware, the scientific_value must be LOW (0-3).
+
+3. INDEPENDENCE RULE:
+   - Hazard and Science are independent. A steep cliff face is HIGH Science (10) AND HIGH Hazard (10). Do not lower one because of the other.
 
 === ANALYSIS TEXT RULES ===
-
 The "analysis_text" field MUST follow this exact structure:
 
-🟡 Terrain Analysis  
-• <single sentence, ≤20 words>
+🟡 Terrain Analysis
+• <sentence with MAXIMUM 20 words>
 
-⚠️ Risk Factors  
-• <single sentence, ≤20 words, physical hazards only>
+⚠️ Risk Factors
+• <sentence with MAXIMUM 20 words focusing on physical obstacles>
 
-🧠 Scientific Value  
-• <single sentence, ≤20 words, geology only>
+🧠 Scientific Value
+• <sentence with MAXIMUM 20 words focusing ONLY on geology>
 
 Rules:
-- Exactly one bullet per section.
-- No extra commentary.
-- Output valid JSON only.
-.
+- Each section must contain EXACTLY one bullet.
+- Each bullet must be 20 words or fewer.
+- "terrain_type" must be a short descriptive phrase.
+- Return valid JSON only.
 """
 
     results = []
@@ -148,7 +148,6 @@ Rules:
     avg_conf = int(statistics.mean(conf_scores))
     
     # Calculate Variance (Standard Deviation)
-    # If standard deviation is HIGH, the AI is "confused" (giving different answers)
     if len(conf_scores) > 1:
         variance = round(statistics.stdev(conf_scores), 2)
     else:
@@ -178,7 +177,31 @@ def delivery_report(err, msg):
     if err: print(f"❌ Kafka Error: {err}")
 
 # ==========================================
-# 4. MAIN MISSION LOOP
+# 4. DUMMY SERVER FOR RENDER
+# ==========================================
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Orbiter is Online")
+
+    # Suppress log messages to keep console clean
+    def log_message(self, format, *args):
+        return
+
+def start_dummy_server():
+    port = int(os.environ.get("PORT", 8080)) # Render gives a PORT env var
+    server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
+    print(f"✅ Dummy Server listening on port {port}")
+    server.serve_forever()
+
+# Start the server in a separate thread so it doesn't block the mission loop
+threading.Thread(target=start_dummy_server, daemon=True).start()
+
+print("\n🚀 ORBITER ONLINE. MONITORING FOR TRANSMISSIONS...\n")
+
+# ==========================================
+# 5. MAIN MISSION LOOP
 # ==========================================
 try:
     while True:
