@@ -77,34 +77,45 @@ Analyze the following Mars rover image and return a JSON object ONLY.
 The JSON must contain the following fields:
 {
   "hazard_score": integer (0–10),
-  "confidence_score": integer (0-100),
+  "confidence_score": integer (0–100),
   "scientific_value": integer (0–10),
   "terrain_type": string,
   "analysis_text": string
 }
 
-CRITICAL RULES FOR "scientific_value":
-1. Score is based SOLELY on geological features (rocks, soil, strata, atmosphere).
-2. DO NOT assign value to rover hardware, wheels, or selfie components visible in the image.
-3. If the image is mostly rover hardware, the scientific_value must be LOW (0-3).
+=== CRITICAL SCORING GUIDELINES (EQUAL WEIGHT) ===
+
+IMPORTANT: Hazard score and Scientific Value must be evaluated independently and with equal importance. Do NOT let one influence the other.
+
+1. HAZARD SCORE (Navigability):
+   - 0–3 (SAFE): Flat bedrock, hard-packed soil, clear open path or if the image is unclear.
+   - 4–6 (CAUTION): Loose sand, small rocks, moderate slopes.
+   - 7–10 (DANGER): Large boulders, steep cliffs, deep sand traps, or drop-offs.
+   *If rover traversal appears unsafe, this score MUST be high.*
+
+2. SCIENTIFIC VALUE (Geology Only):
+   - Score based ONLY on geological features (rocks, strata, soil, erosion).
+   - DO NOT consider rover hardware, shadows, or instrumentation.
+   - If the image is mostly rover hardware, score must be LOW (0–3).
+
+=== ANALYSIS TEXT RULES ===
 
 The "analysis_text" field MUST follow this exact structure:
 
-🟡 Terrain Analysis
-• <sentence with MAXIMUM 20 words>
+🟡 Terrain Analysis  
+• <single sentence, ≤20 words>
 
-⚠️ Risk Factors
-• <sentence with MAXIMUM 20 words>
+⚠️ Risk Factors  
+• <single sentence, ≤20 words, physical hazards only>
 
-🧠 Scientific Value
-• <sentence with MAXIMUM 20 words focusing ONLY on geology, not hardware>
+🧠 Scientific Value  
+• <single sentence, ≤20 words, geology only>
 
 Rules:
-- Each section must contain EXACTLY one bullet.
-- Each bullet must be 20 words or fewer.
-- "terrain_type" must be a short descriptive phrase (e.g., "Rocky plain with scattered boulders").
-- Do NOT add extra sections, commentary, or formatting.
-- Return valid JSON only.
+- Exactly one bullet per section.
+- No extra commentary.
+- Output valid JSON only.
+.
 """
 
     results = []
