@@ -135,7 +135,7 @@ ARES is designed with strict operational guarantees:
 * **Messaging:** Apache Kafka (Confluent Cloud)
 * **Backend:** Python, FastAPI
 * **Frontend:** React, Tailwind CSS, Recharts
-* **Storage:** Google BigQuery
+* **Storage:** Google BigQuery and Google Cloud Storage
 * **Infra:** Event-driven microservices
 
 ---
