@@ -30,11 +30,21 @@ export default function App() {
   const [selectedRover, setSelectedRover] = useState("perseverance"); 
   const [isLaunching, setIsLaunching] = useState(false);
 
+  // --- DYNAMIC API CONFIGURATION ---
+  // 1. Detect if running locally or in production
+  const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+  
+  // 2. Set API Base URL (HTTP/HTTPS)
+  const API_BASE = isLocal 
+      ? "http://127.0.0.1:8000" 
+      : "https://ares-bridge.onrender.com"; 
+
   // --- LOAD HISTORY ON STARTUP ---
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        const res = await fetch("http://127.0.0.1:8000/history");
+        // Updated to use dynamic API_BASE
+        const res = await fetch(`${API_BASE}/history`);
         const data = await res.json();
         
         if (Array.isArray(data) && data.length > 0) {
@@ -88,8 +98,6 @@ export default function App() {
     });
   };
 
-  // --- REMOVED LOCAL STORAGE EFFECTS HERE ---
-
   const handleHistoryClick = (data) => {
       console.log("Viewing History Item:", data);
       
@@ -126,7 +134,8 @@ export default function App() {
     setLogs(prev => [{ time: new Date().toLocaleTimeString(), msg: `📡 Connecting to ${selectedRover.toUpperCase()} (Date: ${missionDate})...`, type: "info" }, ...prev]);
     
     try {
-        const res = await fetch("http://127.0.0.1:8000/trigger_mission", {
+        // Updated to use dynamic API_BASE
+        const res = await fetch(`${API_BASE}/trigger_mission`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ 
@@ -150,7 +159,14 @@ export default function App() {
   };
 
   useEffect(() => {
-    const ws = new WebSocket("ws://127.0.0.1:8000/ws");
+    // 3. Set WebSocket URL (WS/WSS) based on isLocal check
+    const wsUrl = isLocal 
+        ? "ws://127.0.0.1:8000/ws" 
+        : "wss://ares-bridge.onrender.com/ws";
+
+    console.log("Connecting to:", wsUrl); 
+
+    const ws = new WebSocket(wsUrl);
 
     ws.onmessage = (event) => {
       const packet = JSON.parse(event.data);
@@ -171,16 +187,13 @@ export default function App() {
       else if (packet.type === "TELEMETRY") {
         const d = packet.data;
         
-        // We use the current live image URL for the history entry
-        // NOTE: If you click history (changing metadata.imageUrl), this hook restarts 
-        // due to the dependency below. This is standard React behavior.
         const historyItem = { 
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }), 
             score: d.hazard_score,
             science: d.scientific_value || 0,
             action: d.terrain_type,
             sol: d.sol,
-            fullData: { ...d, img_src: d.img_src ||d.imageUrl } 
+            fullData: { ...d, img_src: d.img_src || d.imageUrl } 
         };
 
         setHazardHistory(prev => {
@@ -199,16 +212,16 @@ export default function App() {
       else if (packet.type === "ALERT") {
           const actionText = (packet.data.action || "").toUpperCase();
           const slackLog = { 
-        time: new Date().toLocaleTimeString(), 
-        msg: "📨 Slack Alert Dispatched to Mission Control", 
-        type: "info" 
-        };
+            time: new Date().toLocaleTimeString(), 
+            msg: "📨 Slack Alert Dispatched to Mission Control", 
+            type: "info" 
+          };
           if (actionText.includes("HUMAN") || actionText.includes("REVIEW")) {
               setSystemStatus("REVIEW");
-              setLogs(prev => [slackLog,{ time: new Date().toLocaleTimeString(), msg: `⚠️ REVIEW REQ: ${packet.data.action}`, type: "warning" }, ...prev]);
+              setLogs(prev => [slackLog, { time: new Date().toLocaleTimeString(), msg: `⚠️ REVIEW REQ: ${packet.data.action}`, type: "warning" }, ...prev]);
           } else {
               setSystemStatus("CRITICAL");
-              setLogs(prev => [slackLog,{ time: new Date().toLocaleTimeString(), msg: `🚨 STOP: ${packet.data.action}`, type: "danger" }, ...prev]);
+              setLogs(prev => [slackLog, { time: new Date().toLocaleTimeString(), msg: `🚨 STOP: ${packet.data.action}`, type: "danger" }, ...prev]);
           }
       }
       else if (packet.type === "TREND") {
