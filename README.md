@@ -38,7 +38,7 @@ ARES follows a decoupled, event-driven architecture using **Apache Kafka** as it
          │
          ├──► Kafka (telemetry)
          ├──► BigQuery (historical store)
-         └──► Kafka (alerts)
+         └──► Kafka (alerts) + Google Cloud Storage(Evidence)
                     ↓
             Slack + Mission Control UI
 ```
@@ -159,7 +159,7 @@ Populate credentials inside `.env`.
 
 ```bash
 # Start ingestion & processing
-python -m  bridge:app --reload --port 8000
+python -m uvicorn bridge:app --reload --port 8000
 python orbiter_final.py
 
 # Start alerting
