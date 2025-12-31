@@ -100,9 +100,34 @@ async def kafka_consumer_loop():
             if msg.error(): continue
 
             try:
+                # topic = msg.topic()
+                # raw_val = msg.value().decode('utf-8',errors="ignore")
+                # data = robust_json_parser(raw_val)
+                # if not isinstance(data, dict): continue
+                
+                # --- INSIDE kafka_consumer_loop ---
                 topic = msg.topic()
-                raw_val = msg.value().decode('utf-8')
+                
+                # Retrieve the raw bytes directly
+                raw_bytes = msg.value()
+                raw_val = None
+
+                # CHECK: Is this a Confluent Schema Registry message?
+                # It always starts with a Magic Byte of 0 (null byte)
+                if len(raw_bytes) > 5 and raw_bytes[0] == 0:
+                    try:
+                        # ✅ FIX: Skip the first 5 bytes (Header) and decode the rest
+                        raw_val = raw_bytes[5:].decode('utf-8')
+                    except Exception:
+                        # Fallback if it fails
+                        raw_val = raw_bytes.decode('utf-8', errors='ignore')
+                else:
+                    # Standard JSON (like your Python scripts send)
+                    raw_val = raw_bytes.decode('utf-8')
+                
+                # Now parse the clean JSON string
                 data = robust_json_parser(raw_val)
+                
                 if not isinstance(data, dict): continue
 
                 rover_id = data.get("rover_id", "Unknown")
@@ -188,7 +213,10 @@ async def trigger_mission(mission: MissionRequest):
     if not all_photos:
         raise HTTPException(status_code=404, detail=f"No photos found for {mission.rover_name} on this date.")
 
-    mission_photos = all_photos[:3]
+    if len(all_photos) > 5:
+        mission_photos = random.sample(all_photos, 5)
+    else:
+        mission_photos = all_photos
     asyncio.create_task(stream_photos_to_kafka(mission_photos, mission.earth_date, mission.rover_name.upper()))
 
     return {"status": "Mission Started", "rover": mission.rover_name, "count": len(mission_photos)}
@@ -234,26 +262,52 @@ async def stream_photos_to_kafka(photos, earth_date, rover_id):
 @app.get("/history")
 async def get_mission_history():
     if not bq_client: return []
-    table_id = "project-ares-481115.ares_mission_data.telemetry_logs"
-    query = f"SELECT rover_id, sol, hazard_score, terrain_type, event_time FROM `{table_id}` ORDER BY event_time DESC LIMIT 10"
+    
+    # 1. UPDATE: Correct Table ID (Make sure this matches your actual table)
+    table_id = os.getenv("GOOGLE_BIGQUERY_TABLE")
+    
+    # 2. UPDATE: Select MORE columns (added img_src, scientific_value, analysis_text)
+    query = f"""
+        SELECT 
+            rover_id, sol, hazard_score, terrain_type, event_time, 
+            scientific_value, analysis_text, img_src,confidence_variance
+        FROM `{table_id}` 
+        ORDER BY event_time DESC 
+        LIMIT 2
+    """
+    
     try:
         results = await asyncio.to_thread(bq_client.query(query).result)
         history = []
         for row in results:
+            # Format time
             time_str = "--"
             if row.get("event_time"):
                 try:
                     dt = datetime.datetime.fromtimestamp(row.get("event_time") / 1000.0)
                     time_str = dt.strftime("%H:%M")
                 except: time_str = str(row.get("event_time"))
+            
+            # 3. UPDATE: Build the full packet structure the frontend expects
             history.append({
+                "time": time_str,
                 "sol": row.get("sol"),
                 "score": row.get("hazard_score"),
-                "action": row.get("terrain_type", "Unknown"), 
-                "time": time_str
+                "science": row.get("scientific_value", 0),
+                "action": row.get("terrain_type", "Unknown"),
+                "fullData": {
+                    "rover_id": row.get("rover_id"),
+                    "sol": row.get("sol"),
+                    "img_src": row.get("img_src"), # Critical for the image viewer
+                    "analysis_text": row.get("analysis_text"),
+                    "scientific_value": row.get("scientific_value"),
+                    "confidence_variance": row.get("confidence_variance"),
+                }
             })
         return history
-    except Exception: return []
+    except Exception as e:
+        logger.error(f"History Error: {e}")
+        return []
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

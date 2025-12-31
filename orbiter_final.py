@@ -212,10 +212,18 @@ try:
                 "terrain_type": ai_result['terrain_type'],
                 "scientific_value": ai_result['scientific_value'],
                 "analysis_text": ai_result['analysis_text'],
+                "img_src": img_url, 
                 "event_time": int(time.time() * 1000)
             }
 
-            producer.produce(TELEMETRY_TOPIC, json.dumps(telemetry_packet).encode('utf-8'), callback=delivery_report)
+            # producer.produce(TELEMETRY_TOPIC, json.dumps(telemetry_packet).encode('utf-8'), callback=delivery_report)
+            
+            producer.produce(
+                TELEMETRY_TOPIC, 
+                key=rover_id.encode('utf-8'),  # <--- CRITICAL ADDITION
+                value=json.dumps(telemetry_packet).encode('utf-8'), 
+                callback=delivery_report
+            )
             
             errors = bq_client.insert_rows_json(BQ_TABLE_ID, [telemetry_packet])
             if not errors: print("   📊 Telemetry Logged.")
