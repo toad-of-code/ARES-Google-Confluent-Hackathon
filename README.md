@@ -1,104 +1,208 @@
 # ARES-Google-Confluent-Hackathon
+
+# 🛡️ ARES — Autonomous Rover Evaluation System
+
+**ARES** is a production-grade, event-driven intelligence system designed to support autonomous planetary exploration.
+It acts as a real-time *mission control layer*, ingesting rover imagery, performing AI-based risk analysis, and enforcing safety decisions using explainable, confidence-aware logic.
+
 ---
 
-# 🛡️ ARES: Autonomous Rover Evaluation System 
+## 🧠 System Overview
 
-**ARES** is a production-grade Event-Driven Architecture (EDA) designed for autonomous space exploration. It acts as a "Mission Control" nervous system, ingesting live rover imagery, quantifying environmental hazards using Generative AI, and calculating confidence intervals to prevent autonomous hallucinations.
+ARES operates as a distributed, fault-tolerant system built for environments where **latency, uncertainty, and safety** are critical.
 
-## 🧠 System Architecture
+It combines:
 
-ARES operates on a decoupled, asynchronous architecture using **Apache Kafka** as the central data backbone:
+* Real-time image ingestion
+* Multi-pass AI reasoning
+* Confidence and uncertainty modeling
+* Event-driven alerting
+* Human-in-the-loop safety enforcement
 
-1. **Uplink & Bridge (`bridge_3.py`):** Acts as the gateway, fetching raw imagery from Mars rovers (via Nebulum/NASA APIs) and streaming them into Kafka topics.
-2. **ARES Core (`orbiter_final_2.py`):** The AI engine. It consumes imagery, performs Multi-Pass Analysis using **Google Vertex AI (Gemini 2.5)**, and generates telemetry.
-* *Key Feature:* **Variance Analysis** — ARES runs 3 separate inference passes per image to calculate a "Confidence Score." If the AI's variance is high (>20.0), it flags the data as unstable.
+---
 
+## 🏗️ System Architecture
 
-3. **Telemetry Stream:** Structured risk data (Hazard Score, Scientific Value) is broadcast via WebSockets to the Mission Control UI and archived in **Google BigQuery**.
-4. **Sentinel (`slack_notifier.py`):** A standalone microservice that listens for `mission_alerts`. If ARES detects a Critical Hazard (>7) or High Uncertainty, it instantly dispatches a Slack notification with evidence.
+ARES follows a decoupled, event-driven architecture using **Apache Kafka** as its backbone.
 
-## 🛠️ Tech Stack
+```
+[Rover / NASA API]
+        ↓
+   Kafka (rover_uplink)
+        ↓
+┌────────────────────┐
+│   ARES Core AI     │
+│  • Gemini Analysis │
+│  • Variance Check  │
+└────────┬───────────┘
+         │
+         ├──► Kafka (telemetry)
+         ├──► BigQuery (historical store)
+         └──► Kafka (alerts)
+                    ↓
+            Slack + Mission Control UI
+```
 
-* **AI & Cloud:** Google Vertex AI (Gemini 2.5 Flash), Google Cloud Storage, BigQuery.
-* **Messaging:** Apache Kafka (Confluent Cloud) using SASL_SSL security.
-* **Backend:** Python 3.9+, FastAPI, `confluent-kafka`.
-* **Frontend:** React (Vite), Tailwind CSS, Recharts (Real-time telemetry visualization).
+---
 
-## 📂 Component Map
+## 🧩 Core Components
 
-* `orbiter_final_2.py` - **ARES Core.** The primary AI processor. Connects to `rover_uplink` and produces to `orbiter_telemetry`.
-* `bridge_3.py` - **Comms Bridge.** Handles external API fetching, Kafka producing, and WebSocket broadcasting to the UI.
-* `slack_notifier.py` - **Alert Sentinel.** Listens for critical events and notifies human operators.
-* `App.jsx` - **Mission Control Dashboard.** Visualizes hazard trends, rover feeds, and diagnostic logs.
+### 1️⃣ Uplink & Bridge (`bridge.py`)
+
+Fetches rover imagery from external APIs and streams normalized messages into Kafka.
+
+### 2️⃣ ARES Core (`orbiter_final.py`)
+
+The central intelligence engine that:
+
+* Performs multi-pass inference using **Google Gemini 2.5**
+* Computes hazard scores and scientific value
+* Quantifies model uncertainty via variance analysis
+* Emits telemetry and alerts
+
+### 3️⃣ Telemetry & Storage
+
+* Streams structured data to Kafka
+* Archives historical records in **Google BigQuery**
+
+### 4️⃣ Sentinel (`slack_notifier.py`)
+
+A standalone service that listens for critical events and sends real-time Slack alerts when safety thresholds are breached.
+
+---
+
+## 🔐 System Guarantees & Assumptions
+
+ARES is designed with strict operational guarantees:
+
+* All incoming data is immutable and timestamped
+* Network delays and reordering are expected and tolerated
+* Autonomous decisions are never executed without human oversight
+* Safety always takes precedence over mission continuity
+* All actions are auditable and reproducible
+
+---
+
+## ⚠️ Failure Modes & Recovery
+
+| Failure Type      | Detection Method          | System Response      |
+| ----------------- | ------------------------- | -------------------- |
+| Kafka outage      | Heartbeat timeout         | Buffer & retry       |
+| Model instability | Variance threshold breach | Trigger human review |
+| Invalid data      | Schema validation failure | Drop & log           |
+| Slack outage      | Delivery failure          | Retry with backoff   |
+| Image fetch error | HTTP failure              | Skip frame, continue |
+
+---
+
+## 🧪 Event Schemas
+
+### `mission_alerts`
+
+```json
+{
+  "alert_id": "uuid",
+  "rover_id": "perseverance",
+  "hazard_level": 8,
+  "variance_level": 21.3,
+  "action": "CRITICAL_STOP",
+  "evidence_url": "https://...",
+  "timestamp": 1710000000
+}
+```
+
+### `orbiter_telemetry`
+
+```json
+{
+  "rover_id": "curiosity",
+  "hazard_score": 6,
+  "scientific_value": 7,
+  "confidence_variance": 4.1,
+  "terrain_type": "rocky_plain",
+  "event_time": 1710000000
+}
+```
+
+---
+
+## 🧰 Tech Stack
+
+* **AI / ML:** Google Vertex AI (Gemini 2.5)
+* **Messaging:** Apache Kafka (Confluent Cloud)
+* **Backend:** Python, FastAPI
+* **Frontend:** React, Tailwind CSS, Recharts
+* **Storage:** Google BigQuery
+* **Infra:** Event-driven microservices
+
+---
 
 ## 🚀 Getting Started
 
-### 1. Prerequisites
+### 1️⃣ Prerequisites
 
-* Python 3.9+ & Node.js
-* Google Cloud Project (Vertex AI & BigQuery enabled)
-* Confluent Cloud Account (Kafka)
-* Slack Webhook URL
+* Python 3.9+
+* Node.js 18+
+* Google Cloud Project (Vertex AI + BigQuery enabled)
+* Confluent Cloud account
+* Slack webhook URL
 
-### 2. Environment Variables
-
-Create a `.env` file in your backend directory:
+### 2️⃣ Setup Environment
 
 ```bash
-GOOGLE_PROJECT_ID=your_project_id
-GCS_BUCKET_NAME=your_bucket
-BOOTSTRAP_SERVERS=your_kafka_broker
-KAFKA_API_KEY=your_key
-KAFKA_API_SECRET=your_secret
-SLACK_WEBHOOK=your_slack_url
-
+cp .env.example .env
 ```
 
-### 3. Mission Launch
+Populate credentials inside `.env`.
 
-**Terminal 1: Start the Comms Bridge**
-
-```bash
-python bridge_3.py
-
-```
-
-**Terminal 2: Activate ARES Core**
+### 3️⃣ Run the System
 
 ```bash
-python orbiter_final_2.py
+# Start ingestion & processing
+python -m  bridge:app --reload --port 8000
+python orbiter_final.py
 
-```
-
-**Terminal 3: Enable Sentinel**
-
-```bash
+# Start alerting
 python slack_notifier.py
 
-```
-
-**Terminal 4: Launch Dashboard**
-
-```bash
+# Launch frontend
+cd orbiter-dashboard-frontend
+npm install
 npm run dev
-
 ```
 
-## 🎮 Usage Protocol
+---
 
-1. **Initialize:** Open Mission Control at `http://localhost:5173`.
-2. **Target:** Select a Rover (e.g., Perseverance) and an Earth Date.
-3. **Uplink:** Click **"UPLINK"**. This triggers `bridge_3.py` to fetch imagery and push to Kafka.
-4. **Monitor:**
-* **ARES Core** analyzes images for terrain hazards and scientific value.
-* **Dashboard** updates graphs in real-time via WebSockets.
-* **Sentinel** alerts Slack if a STOP condition (Hazard > 7) is met.
+## 🧭 Operational Behavior
 
+| Condition        | System Response          |
+| ---------------- | ------------------------ |
+| Hazard ≤ 7       | Continue mission         |
+| Hazard > 7       | Trigger alert            |
+| High uncertainty | Require human review     |
+| Data loss        | Skip frame, log incident |
 
+---
 
-## 📊 Safety Protocols
+## 🔮 Roadmap
 
-ARES implements a **Human-in-the-Loop** safety mechanism based on statistical variance:
+* Multi-model ensemble reasoning
+* Temporal anomaly detection
+* Offline simulation & replay mode
+* Kubernetes-native deployment
+* Role-based access control
 
-* **Critical Hazard:** If Hazard Score > 7 → **AUTO-STOP** signal sent.
-* **High Uncertainty:** If the AI's internal variance > 20.0 (meaning the model is "confused") → **HUMAN REVIEW REQ** signal sent, regardless of the hazard score.
+---
+
+## 📜 License
+
+This project is licensed under the **MIT License**.
+See the [LICENSE](./LICENSE) file for details.
+
+---
+
+## 👨‍🚀 Author
+
+**Rahul Roy**
+*AI Systems · Distributed Systems · Autonomous Intelligence*
+
