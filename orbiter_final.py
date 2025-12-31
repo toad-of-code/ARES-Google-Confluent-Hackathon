@@ -20,7 +20,7 @@ load_dotenv()
 PROJECT_ID = os.getenv('GOOGLE_PROJECT_ID')
 LOCATION = "us-central1"
 BUCKET_NAME = os.getenv('GCS_BUCKET_NAME')
-BQ_TABLE_ID = f"{PROJECT_ID}.ares_mission_data.telemetry_logs"
+BQ_TABLE_ID = os.getenv("GOOGLE_BIGQUERY_TABLE")
 
 CONF = {
     'bootstrap.servers': os.getenv('BOOTSTRAP_SERVERS'),
