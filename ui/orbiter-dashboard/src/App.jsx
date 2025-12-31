@@ -23,12 +23,38 @@ export default function App() {
   const [pastMissions, setPastMissions] = useState([]); 
   
   const [lastAnalysis, setLastAnalysis] = useState(""); 
-  const [safetyTrend, setSafetyTrend] = useState(0);
+  const [safetyTrend, setSafetyTrend] = useState(-1);
 
   // --- MISSION CONTROL STATE ---
   const [missionDate, setMissionDate] = useState("2024-01-01"); 
   const [selectedRover, setSelectedRover] = useState("perseverance"); 
   const [isLaunching, setIsLaunching] = useState(false);
+
+  // --- LOAD HISTORY ON STARTUP ---
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const res = await fetch("http://127.0.0.1:8000/history");
+        const data = await res.json();
+        
+        if (Array.isArray(data) && data.length > 0) {
+          // Reverse to show oldest -> newest on the chart
+          const reversed = [...data].reverse();
+          setHazardHistory(reversed);
+          setPastMissions(data); // Table usually shows Newest -> Oldest
+          
+          // Optional: Load the most recent mission into the main view
+          if (data[0]) {
+             handleHistoryClick(data[0]);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load history:", err);
+      }
+    };
+    
+    fetchHistory();
+  }, []);
 
   const [metadata, setMetadata] = useState({
       sol: "--",
@@ -80,9 +106,18 @@ export default function App() {
       setLastAnalysis(analysisText);
       setDiagnostics(generateDiagnostics(analysisText));
       
-      if (data.score > 7) setSystemStatus("CRITICAL");
-      else if (data.score > 4) setSystemStatus("REVIEW"); 
-      else setSystemStatus("SAFE");
+      const variance = data.fullData.confidence_variance || 0;
+
+      if (data.score > 7) {
+          setSystemStatus("CRITICAL");
+      } 
+      else if (variance > 20) {
+          // If Hazard is low but AI is confused (High Variance) -> REVIEW
+          setSystemStatus("REVIEW");
+      } 
+      else {
+          setSystemStatus("SAFE");
+      }
   };
 
   const triggerMission = async () => {
@@ -145,7 +180,7 @@ export default function App() {
             science: d.scientific_value || 0,
             action: d.terrain_type,
             sol: d.sol,
-            fullData: { ...d, img_src: d.img_src ||d.imageUrl|| metadata.imageUrl } 
+            fullData: { ...d, img_src: d.img_src ||d.imageUrl } 
         };
 
         setHazardHistory(prev => {
@@ -163,12 +198,17 @@ export default function App() {
       } 
       else if (packet.type === "ALERT") {
           const actionText = (packet.data.action || "").toUpperCase();
+          const slackLog = { 
+        time: new Date().toLocaleTimeString(), 
+        msg: "📨 Slack Alert Dispatched to Mission Control", 
+        type: "info" 
+        };
           if (actionText.includes("HUMAN") || actionText.includes("REVIEW")) {
               setSystemStatus("REVIEW");
-              setLogs(prev => [{ time: new Date().toLocaleTimeString(), msg: `⚠️ REVIEW REQ: ${packet.data.action}`, type: "warning" }, ...prev]);
+              setLogs(prev => [slackLog,{ time: new Date().toLocaleTimeString(), msg: `⚠️ REVIEW REQ: ${packet.data.action}`, type: "warning" }, ...prev]);
           } else {
               setSystemStatus("CRITICAL");
-              setLogs(prev => [{ time: new Date().toLocaleTimeString(), msg: `🚨 STOP: ${packet.data.action}`, type: "danger" }, ...prev]);
+              setLogs(prev => [slackLog,{ time: new Date().toLocaleTimeString(), msg: `🚨 STOP: ${packet.data.action}`, type: "danger" }, ...prev]);
           }
       }
       else if (packet.type === "TREND") {
@@ -178,7 +218,7 @@ export default function App() {
       }
     };
     return () => ws.close();
-  }, [metadata.imageUrl]); // Dependency required to capture correct image URL in history
+  }, []); // Dependency required to capture correct image URL in history
 
   const renderStatusBox = () => {
       if (systemStatus === 'CRITICAL') {
@@ -242,8 +282,6 @@ export default function App() {
                 >
                     <option value="perseverance">Perseverance</option>
                     <option value="curiosity">Curiosity</option>
-                    <option value="opportunity">Opportunity</option>
-                    <option value="spirit">Spirit</option>
                 </select>
             </div>
             <div className="relative">
