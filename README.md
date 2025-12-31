@@ -115,12 +115,15 @@ ARES is designed with strict operational guarantees:
 
 ```json
 {
-  "rover_id": "curiosity",
-  "hazard_score": 6,
+  "rover_id": "CURIOSITY",
+  "sol": 21,
+  "hazard_score": 2,
+  "confidence_score": 95,
+  "confidence_variance": 0,
+  "terrain_type": "rocky plain",
   "scientific_value": 7,
-  "confidence_variance": 4.1,
-  "terrain_type": "rocky_plain",
-  "event_time": 1710000000
+  "analysis_text": "AI powered analysis",
+  "event_time": 1767201841296
 }
 ```
 
@@ -151,9 +154,10 @@ ARES is designed with strict operational guarantees:
 
 ```bash
 cp .env.example .env
+pip install -r req.txt
 ```
 
-Populate credentials inside `.env`.
+Populate credentials inside `.env` and install requirements.
 
 ### 3️⃣ Run the System
 
