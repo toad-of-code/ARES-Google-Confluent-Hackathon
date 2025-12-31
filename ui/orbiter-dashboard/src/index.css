@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background-color: #050508;
+  background-image: radial-gradient(circle at center, #1a1a2e 0%, #000000 100%);
+  color: #e0e0e0;
+}
+
+/* Custom utility for sci-fi panels */
+.panel {
+  @apply bg-panelBg border border-teal-900/50 rounded-lg shadow-[0_0_15px_rgba(0,255,242,0.05)] transition-all duration-300;
+}
+
+.glow-text { text-shadow: 0 0 8px rgba(0, 255, 242, 0.5); }
+.glow-green { text-shadow: 0 0 10px rgba(0, 255, 65, 0.6); }
+.glow-red { text-shadow: 0 0 10px rgba(255, 42, 42, 0.6); }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-thumb { background: #00fff240; border-radius: 4px; }
+::-webkit-scrollbar-track { background: transparent; }

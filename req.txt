@@ -1,0 +1,11 @@
+confluent-kafka
+google-cloud-aiplatform
+requests
+google-cloud-storage
+google-cloud-bigquery
+slack_sdk 
+python-dotenv
+fastapi
+uvicorn
+websockets
+asyncio
