@@ -43,6 +43,24 @@ ALERTS_TOPIC = "mission_alerts"
 # ==========================================
 print("🛰️ INITIALIZING ORBITER AI SYSTEMS...")
 
+# This ensures the key exists even if the build command failed
+key_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
+
+if key_path and not os.path.exists(key_path):
+    print(f"ℹ️ Key file missing at {key_path}. Creating from environment variable...")
+    
+    # Get the JSON content we saved in Render Env Vars
+    creds_json = os.getenv('GOOGLE_CREDENTIALS_JSON')
+    
+    if creds_json:
+        # Write it to the file
+        with open(key_path, 'w') as f:
+            f.write(creds_json)
+        print("✅ Google Key File Created Successfully.")
+    else:
+        print("❌ CRITICAL ERROR: GOOGLE_CREDENTIALS_JSON variable is missing in Render!")
+# ----------------------------------------------------
+
 try:
     vertexai.init(project=PROJECT_ID, location=LOCATION)
     model = GenerativeModel("gemini-2.5-flash")
