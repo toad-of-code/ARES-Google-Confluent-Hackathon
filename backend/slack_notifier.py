@@ -1,6 +1,9 @@
 import json
 import os
 import requests
+import sys
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from confluent_kafka import Consumer, KafkaException
 from dotenv import load_dotenv
 
@@ -26,6 +29,29 @@ conf = {
     "sasl.password": KAFKA_API_SECRET
 }
 
+# ==========================================
+# 1. DUMMY SERVER FOR RENDER (KEEPS IT ALIVE)
+# ==========================================
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Slack Sentinel is Online")
+
+    # Suppress log messages to keep console clean
+    def log_message(self, format, *args):
+        return
+
+def start_dummy_server():
+    # Render provides the PORT env var. Default to 8080 locally.
+    port = int(os.environ.get("PORT", 8080))
+    server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
+    print(f"✅ Dummy Server listening on port {port}")
+    server.serve_forever()
+
+# ==========================================
+# 2. MAIN BOT LOGIC
+# ==========================================
 def start_slack_bot():
     consumer = Consumer(conf)
     
@@ -54,6 +80,7 @@ def start_slack_bot():
 🚨 *CRITICAL MARS ALERT*
 *Rover:* {alert.get('rover_id', 'Unknown')}
 *Hazard Level:* {alert.get('hazard_level', 'Unknown')}
+*Variance:* {alert.get('variance_level', 'N/A')}
 *Action:* {alert.get('action', 'N/A')}
 📸 *Evidence:* {alert.get('evidence_url', 'No Image')}
 """
@@ -78,4 +105,8 @@ def start_slack_bot():
         consumer.close()
 
 if __name__ == "__main__":
+    # Start the dummy server in a separate thread so it doesn't block the Kafka loop
+    threading.Thread(target=start_dummy_server, daemon=True).start()
+    
+    # Start the main loop
     start_slack_bot()
